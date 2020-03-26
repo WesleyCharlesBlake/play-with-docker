@@ -61,7 +61,8 @@ func Register(extend HandlerExtender) {
 		if strings.Contains(origin, "localhost") ||
 			strings.HasSuffix(origin, "play-with-docker.com") ||
 			strings.HasSuffix(origin, "play-with-kubernetes.com") ||
-			strings.HasSuffix(origin, "play-with-moby.com") {
+			strings.HasSuffix(origin, "docker.com") ||
+			strings.HasSuffix(origin, "play-with-golang.now.sh") {
 			return true
 		}
 		return false
@@ -71,6 +72,7 @@ func Register(extend HandlerExtender) {
 	r.HandleFunc("/ping", Ping).Methods("GET")
 	corsRouter.HandleFunc("/instances/images", GetInstanceImages).Methods("GET")
 	corsRouter.HandleFunc("/sessions/{sessionId}", GetSession).Methods("GET")
+	corsRouter.HandleFunc("/sessions/{sessionId}/close", CloseSession).Methods("POST")
 	corsRouter.HandleFunc("/sessions/{sessionId}", CloseSession).Methods("DELETE")
 	corsRouter.HandleFunc("/sessions/{sessionId}/setup", SessionSetup).Methods("POST")
 	corsRouter.HandleFunc("/sessions/{sessionId}/instances", NewInstance).Methods("POST")
@@ -239,14 +241,16 @@ func initOauthProviders(p *types.Playground) {
 		config.Providers[p.Id]["facebook"] = conf
 	}
 	if p.DockerClientID != "" && p.DockerClientSecret != "" {
-		oauth2.RegisterBrokenAuthHeaderProvider(".id.docker.com")
+
+		endpoint := getDockerEndpoint(p)
+		oauth2.RegisterBrokenAuthHeaderProvider(fmt.Sprintf(".%s", endpoint))
 		conf := &oauth2.Config{
 			ClientID:     p.DockerClientID,
 			ClientSecret: p.DockerClientSecret,
 			Scopes:       []string{"openid"},
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  "https://id.docker.com/id/oauth/authorize/",
-				TokenURL: "https://id.docker.com/id/oauth/token",
+				AuthURL:  fmt.Sprintf("https://%s/id/oauth/authorize/", endpoint),
+				TokenURL: fmt.Sprintf("https://%s/id/oauth/token", endpoint),
 			},
 		}
 

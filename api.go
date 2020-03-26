@@ -47,12 +47,12 @@ func main() {
 
 	sch.Start()
 
-	d, err := time.ParseDuration(config.DefaultSessionDuration)
+	d, err := time.ParseDuration("4h")
 	if err != nil {
-		log.Fatalf("Cannot parse duration %s. Got: %v", config.DefaultSessionDuration, err)
+		log.Fatalf("Cannot parse duration Got: %v", err)
 	}
 
-	playground := types.Playground{Domain: config.PlaygroundDomain, DefaultDinDInstanceImage: config.DefaultDinDImage, AllowWindowsInstances: config.NoWindows, DefaultSessionDuration: d, AvailableDinDInstanceImages: []string{config.DefaultDinDImage}, Tasks: []string{".*"}}
+	playground := types.Playground{Domain: config.PlaygroundDomain, DefaultDinDInstanceImage: "franela/dind", AvailableDinDInstanceImages: []string{"franela/dind"}, AllowWindowsInstances: config.NoWindows, DefaultSessionDuration: d, Tasks: []string{".*"}, Extras: map[string]interface{}{"LoginRedirect": "http://localhost:3000"}}
 	if _, err := core.PlaygroundNew(playground); err != nil {
 		log.Fatalf("Cannot create default playground. Got: %v", err)
 	}

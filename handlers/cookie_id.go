@@ -10,13 +10,15 @@ type CookieID struct {
 	Id         string `json:"id"`
 	UserName   string `json:"user_name"`
 	UserAvatar string `json:"user_avatar"`
+	ProviderId string `json:"provider_id"`
 }
 
-func (c *CookieID) SetCookie(rw http.ResponseWriter) error {
+func (c *CookieID) SetCookie(rw http.ResponseWriter, host string) error {
 	if encoded, err := config.SecureCookie.Encode("id", c); err == nil {
 		cookie := &http.Cookie{
 			Name:     "id",
 			Value:    encoded,
+			Domain:   host,
 			Path:     "/",
 			Secure:   config.UseLetsEncrypt,
 			HttpOnly: true,

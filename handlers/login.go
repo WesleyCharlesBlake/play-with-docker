@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"golang.org/x/oauth2"
 
@@ -14,7 +15,7 @@ import (
 	fb "github.com/huandu/facebook"
 	"github.com/play-with-docker/play-with-docker/config"
 	"github.com/play-with-docker/play-with-docker/pwd/types"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func LoggedInUser(rw http.ResponseWriter, req *http.Request) {
@@ -166,7 +167,9 @@ func LoginCallback(rw http.ResponseWriter, req *http.Request) {
 			&oauth2.Token{AccessToken: tok.AccessToken},
 		)
 		tc := oauth2.NewClient(ctx, ts)
-		resp, err := tc.Get("https://id.docker.com/api/id/v1/openid/userinfo")
+
+		endpoint := getDockerEndpoint(playground)
+		resp, err := tc.Get(fmt.Sprintf("https://%s/api/id/v1/openid/userinfo", endpoint))
 		if err != nil {
 			log.Printf("Could not get user from docker. Got: %v\n", err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -195,13 +198,22 @@ func LoginCallback(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cookieData := CookieID{Id: user.Id, UserName: user.Name, UserAvatar: user.Avatar}
+	cookieData := CookieID{Id: user.Id, UserName: user.Name, UserAvatar: user.Avatar, ProviderId: user.ProviderUserId}
 
-	if err := cookieData.SetCookie(rw); err != nil {
+	host := "localhost"
+	if req.Host != "" {
+		// we get the parent domain so cookie is set
+		// in all subdomain and siblings
+		host = getParentDomain(req.Host)
+	}
+
+	if err := cookieData.SetCookie(rw, host); err != nil {
 		log.Printf("Could not encode cookie. Got: %v\n", err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	r, _ := playground.Extras.GetString("LoginRedirect")
 
 	fmt.Fprintf(rw, `
 <html>
@@ -209,14 +221,33 @@ func LoginCallback(rw http.ResponseWriter, req *http.Request) {
 	<script>
 	if (window.opener && !window.opener.closed) {
 	    try {
-	      window.opener.postMessage('done','*')
+	      window.opener.postMessage('done','*');
 	    }
 	    catch(e) {  }
 	    window.close();
+	} else {
+	    window.location = '%s';
 	}
 	</script>
     </head>
     <body>
     </body>
-</html>`)
+</html>`, r)
+}
+
+// getParentDomain returns the parent domain (if available)
+// of the currend domain
+func getParentDomain(host string) string {
+	levels := strings.Split(host, ".")
+	if len(levels) > 2 {
+		return strings.Join(levels[1:], ".")
+	}
+	return host
+}
+
+func getDockerEndpoint(p *types.Playground) string {
+	if len(p.DockerHost) > 0 {
+		return p.DockerHost
+	}
+	return "id.docker.com"
 }

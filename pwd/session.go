@@ -32,6 +32,7 @@ func (s *sessionBuilderWriter) Write(p []byte) (n int, err error) {
 type SessionSetupConf struct {
 	Instances      []SessionSetupInstanceConf `json:"instances"`
 	PlaygroundFQDN string
+	DindVolumeSize string
 }
 
 type SessionSetupInstanceConf struct {
@@ -46,6 +47,10 @@ type SessionSetupInstanceConf struct {
 
 func (p *pwd) SessionNew(ctx context.Context, config types.SessionConfig) (*types.Session, error) {
 	defer observeAction("SessionNew", time.Now())
+
+	if u, err := p.storage.UserGet(config.UserId); err == nil && u.IsBanned {
+		return nil, fmt.Errorf("User %s is banned\n", config.UserId)
+	}
 
 	s := &types.Session{}
 	s.Id = p.generator.NewId()
@@ -165,7 +170,7 @@ func (p *pwd) SessionDeployStack(s *types.Session) error {
 
 	s.Ready = false
 	p.event.Emit(event.SESSION_READY, s.Id, false)
-	i, err := p.InstanceNew(s, types.InstanceConfig{ImageName: s.ImageName, PlaygroundFQDN: s.Host})
+	i, err := p.InstanceNew(s, types.InstanceConfig{ImageName: s.ImageName, PlaygroundFQDN: s.Host, DindVolumeSize: "5G"})
 	if err != nil {
 		log.Printf("Error creating instance for stack [%s]: %s\n", s.Stack, err)
 		return err
@@ -246,6 +251,7 @@ func (p *pwd) SessionSetup(session *types.Session, sconf SessionSetupConf) error
 				PlaygroundFQDN: sconf.PlaygroundFQDN,
 				Type:           conf.Type,
 				Tls:            conf.Tls,
+				DindVolumeSize: sconf.DindVolumeSize,
 			}
 			i, err := p.InstanceNew(session, instanceConf)
 			if err != nil {

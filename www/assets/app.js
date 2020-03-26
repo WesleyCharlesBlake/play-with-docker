@@ -19,13 +19,13 @@
     }
   }
 
-  app.controller('PlayController', ['$scope', '$log', '$http', '$location', '$timeout', '$mdDialog', '$window', 'TerminalService', 'KeyboardShortcutService', 'InstanceService', 'SessionService', 'Upload', function($scope, $log, $http, $location, $timeout, $mdDialog, $window, TerminalService, KeyboardShortcutService, InstanceService, SessionService, Upload) {
+  app.controller('PlayController', ['$scope', '$rootScope', '$log', '$http', '$location', '$timeout', '$mdDialog', '$window', 'TerminalService', 'KeyboardShortcutService', 'InstanceService', 'SessionService', 'Upload', function($scope, $rootScope,  $log, $http, $location, $timeout, $mdDialog, $window, TerminalService, KeyboardShortcutService, InstanceService, SessionService, Upload) {
     $scope.sessionId = SessionService.getCurrentSessionId();
-    $scope.instances = [];
+    $rootScope.instances = [];
     $scope.idx = {};
     $scope.host = window.location.host;
     $scope.idxByHostname = {};
-    $scope.selectedInstance = null;
+    $rootScope.selectedInstance = null;
     $scope.isAlive = true;
     $scope.ttl = '--:--:--';
     $scope.connected = false;
@@ -46,7 +46,7 @@
             return
           }
           $scope.uploadMessage = "Uploading file(s) " + (total - files.length) + "/"+ total + " : " + file.name;
-          let upload = Upload.upload({url: '/sessions/' + $scope.sessionId + '/instances/' + $scope.selectedInstance.name + '/uploads', data: {file: file}, method: 'POST'})
+          let upload = Upload.upload({url: '/sessions/' + $scope.sessionId + '/instances/' + $rootScope.selectedInstance.name + '/uploads', data: {file: file}, method: 'POST'})
             .then(function(){}, function(){}, function(evt) {
               $scope.uploadProgress = parseInt(100.0 * evt.loaded / evt.total);
             });
@@ -63,7 +63,7 @@
     $scope.resizeHandler = null;
 
     angular.element($window).bind('resize', function() {
-      if ($scope.selectedInstance) {
+      if ($rootScope.selectedInstance) {
         if (!$scope.resizeHandler) {
             $scope.resizeHandler = setTimeout(function() {
                 $scope.resizeHandler = null
@@ -108,7 +108,7 @@
     $scope.upsertInstance = function(info) {
       var i = info;
       if (!$scope.idx[i.name]) {
-        $scope.instances.push(i);
+        $rootScope.instances.push(i);
         i.buffer = '';
         $scope.idx[i.name] = i;
         $scope.idxByHostname[i.hostname] = i;
@@ -181,7 +181,7 @@
         var i = response.data;
         for (var k in i.instances) {
           var instance = i.instances[k];
-          $scope.instances.push(instance);
+          $rootScope.instances.push(instance);
           $scope.idx[instance.name] = instance;
           $scope.idxByHostname[instance.hostname] = instance;
         }
@@ -218,8 +218,8 @@
 
 	socket.addEventListener('open', function (event) {
           $scope.connected = true;
-	  for (var i in $scope.instances) {
-		  var instance = $scope.instances[i];
+	  for (var i in $rootScope.instances) {
+		  var instance = $rootScope.instances[i];
 		  if (instance.term) {
 			  instance.term.setOption('disableStdin', false);
 		  }
@@ -227,8 +227,8 @@
 	});
 	socket.addEventListener('close', function (event) {
           $scope.connected = false;
-	  for (var i in $scope.instances) {
-		  var instance = $scope.instances[i];
+	  for (var i in $rootScope.instances) {
+		  var instance = $rootScope.instances[i];
 		  if (instance.term) {
 			  instance.term.setOption('disableStdin', true);
 		  }
@@ -304,7 +304,7 @@
                 return
             }
           // viewport has changed, we need to resize all terminals
-          $scope.instances.forEach(function(instance) {
+          $rootScope.instances.forEach(function(instance) {
               if (instance.term) {
                 instance.term.resize(cols, rows);
                 if (instance.buffer) {
@@ -377,9 +377,9 @@
         let inst = $scope.idx[$location.hash()];
         if (inst) {
             $scope.showInstance(inst);
-        } else if($scope.instances.length > 0) {
+        } else if($rootScope.instances.length > 0) {
             // if no instance has been passed, select the first.
-            $scope.showInstance($scope.instances[0]);
+            $scope.showInstance($rootScope.instances[0]);
         }
       }, function(response) {
         if (response.status == 404) {
@@ -389,6 +389,14 @@
       });
     }
 
+    $scope.openPort = function(instance) {
+      var port = prompt('What port would you like to open?');
+      if (!port) return;
+      
+      var url = $scope.getProxyUrl(instance, port);
+      window.open(url, '_blank');
+    }
+
     $scope.getProxyUrl = function(instance, port) {
       var url = 'http://' + instance.proxy_host + '-' + port + '.direct.' + $scope.host;
 
@@ -396,7 +404,7 @@
     }
 
     $scope.showInstance = function(instance) {
-      $scope.selectedInstance = instance;
+      $rootScope.selectedInstance = instance;
       $location.hash(instance.name);
       if (!instance.term) {
           $timeout(function() {
@@ -418,11 +426,11 @@
         }
       if ($scope.idx[name]) {
         delete $scope.idx[name];
-        $scope.instances = $scope.instances.filter(function(i) {
+        $rootScope.instances = $rootScope.instances.filter(function(i) {
           return i.name != name;
         });
-        if ($scope.instances.length) {
-          $scope.showInstance($scope.instances[0]);
+        if ($rootScope.instances.length) {
+          $scope.showInstance($rootScope.instances[0]);
         }
       }
     }
@@ -471,34 +479,34 @@
         cursorBlink: false
       });
 
-      term.attachCustomKeydownHandler(function(e) {
+      term.open(terminalContainer);
+
+
+      const handleCopy = (e) => {
         // Ctrl + Alt + C
         if (e.ctrlKey && e.altKey && (e.keyCode == 67)) {
           document.execCommand('copy');
           return false;
         }
-      });
+      };
 
-      term.attachCustomKeydownHandler(function(e) {
-        if (selectedKeyboardShortcuts == null)
-          return;
+      term.attachCustomKeyEventHandler(function(e) {
+        // handleCopy(e);
+        if (selectedKeyboardShortcuts == null) return;
+
         var presets = selectedKeyboardShortcuts.presets
         .filter(function(preset) { return preset.keyCode == e.keyCode })
         .filter(function(preset) { return (preset.metaKey == undefined && !e.metaKey) || preset.metaKey == e.metaKey })
         .filter(function(preset) { return (preset.ctrlKey == undefined && !e.ctrlKey) || preset.ctrlKey == e.ctrlKey })
         .filter(function(preset) { return (preset.altKey == undefined && !e.altKey) || preset.altKey == e.altKey })
-        .forEach(function(preset) { preset.action({ terminal : term })});
+        .forEach(function(preset) { preset.action({ terminal : term, e })});
       });
-
-      term.open(terminalContainer);
 
       // Set geometry during the next tick, to avoid race conditions.
 
-        /*
       setTimeout(function() {
         $scope.resize(term.proposeGeometry());
-      }, 4);
-      */
+      }, 0);
 
       instance.terminalBuffer = '';
       instance.terminalBufferInterval = setInterval(function() {
@@ -665,7 +673,17 @@
 					{hostname: 'manager5', is_swarm_manager: true}
 				]
 			}
-		}
+		},
+		{
+                        title: '1 Manager and 1 Worker',
+                        icon: '/assets/swarm.png',
+                        setup: {
+                                instances: [
+                                        {hostname: 'manager1', is_swarm_manager: true},
+                                        {hostname: 'worker1', is_swarm_manager: false}
+                                ]
+                        }
+                }
 	];
 
     return {
@@ -744,14 +762,59 @@
 
     function getAvailablePresets() {
       return [
-        { name : "None", presets : [
-          { description : "Toggle terminal fullscreen", command : "Alt+enter", altKey : true, keyCode : 13, action : function(context) { TerminalService.toggleFullscreen(context.terminal, resizeFunc); }}
-        ] },
+        {
+          name : "None",
+          presets : [
+            {
+              description : "Toggle terminal fullscreen", command : "Alt+enter", altKey : true, keyCode : 13, action : function(context) { TerminalService.toggleFullScreen(context.terminal, resizeFunc); }
+            },
+            {
+              description: "Increase Font Size",
+              command: "Ctrl++",
+              ctrlKey : true,
+              keyCode: 187,
+              action: function(context) {
+                TerminalService.increaseFontSize();
+                context.e.preventDefault()
+              }
+            },
+            {
+              description: "Decrease Font Size",
+              command: "Ctrl+-",
+              ctrlKey: true,
+              keyCode: 189,
+              action: function(context) {
+                context.e.preventDefault()
+                TerminalService.decreaseFontSize();
+              }
+            }
+          ]
+        },
         {
           name : "Mac OSX",
           presets : [
             { description : "Clear terminal", command : "Cmd+K", metaKey : true, keyCode : 75, action : function(context) { context.terminal.clear(); }},
-            { description : "Toggle terminal fullscreen", command : "Alt+enter", altKey : true, keyCode : 13, action : function(context) { TerminalService.toggleFullscreen(context.terminal, resizeFunc); }}
+            { description : "Toggle terminal fullscreen", command : "Alt+enter", altKey : true, keyCode : 13, action : function(context) { TerminalService.toggleFullScreen(context.terminal, resizeFunc); }},
+            {
+              description: "Increase Font Size",
+              command: "Cmd++",
+              metaKey : true,
+              keyCode: 187,
+              action: function(context) {
+                TerminalService.increaseFontSize();
+                context.e.preventDefault()
+              }
+            },
+            {
+              description: "Decrease Font Size",
+              command: "Cmd+-",
+              metaKey: true,
+              keyCode: 189,
+              action: function(context) {
+                context.e.preventDefault()
+                TerminalService.decreaseFontSize();
+              }
+            }
           ]
         }
       ]
@@ -783,7 +846,7 @@
       return "None";
     }
   }])
-  .service('TerminalService', ['$window', function($window) {
+  .service('TerminalService', ['$window', '$rootScope', function($window, $rootScope) {
     var fullscreen;
     var fontSize = getFontSize();
     return {
@@ -792,7 +855,7 @@
       getFontSize : getFontSize,
       increaseFontSize : increaseFontSize,
       decreaseFontSize : decreaseFontSize,
-      toggleFullscreen : toggleFullscreen
+      toggleFullScreen : toggleFullScreen
     };
     function getFontSizes() {
       var terminalFontSizes = [];
@@ -802,17 +865,19 @@
       return terminalFontSizes;
     };
     function getFontSize() {
-      if (!fontSize) {
-        return $('.terminal').css('font-size');
+      if($rootScope.selectedInstance){
+        return $rootScope.selectedInstance.term.getOption("fontSize") + "px"
+      }else{
+        return $(".terminal").css("font-size")
       }
-      return fontSize;
     }
     function setFontSize(value) {
+      const { term }= $rootScope.selectedInstance;
       fontSize = value;
       var size = parseInt(value);
-      $('.terminal').css('font-size', value).css('line-height', (size + 2)+'px');
-      //.css('line-height', value).css('height', value);
-      angular.element($window).trigger('resize');
+      term.setOption("fontSize", size)
+      term.resize(1,1)
+      term.fit()
     }
     function increaseFontSize() {
       var sizes = getFontSizes();
@@ -838,15 +903,24 @@
       }
       setFontSize(sizes[i-1]);
     }
-    function toggleFullscreen(terminal, resize) {
+    function toggleFullScreen(terminal, resize) {
       if(fullscreen) {
-        terminal.toggleFullscreen();
-        resize(fullscreen);
+        terminal.toggleFullScreen();
+        terminal.containerElement.append(terminal.element)
+        setTimeout(()=>{
+          terminal.resize(1,1);
+          terminal.fit();
+          terminal.focus();
+        },100)
         fullscreen = null;
       } else {
+        // save the current parent
+        terminal.containerElement = $(terminal.element).parent()
+        $("body").append(terminal.element)
         fullscreen = terminal.proposeGeometry();
-        terminal.toggleFullscreen();
-        angular.element($window).trigger('resize');
+        terminal.toggleFullScreen();
+        terminal.fit();
+        terminal.focus();
       }
     }
   }]);

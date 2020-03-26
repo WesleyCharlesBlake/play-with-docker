@@ -1,7 +1,8 @@
 ARG VERSION=docker:stable-dind
 FROM ${VERSION}
 
-RUN apk add --no-cache git tmux py2-pip apache2-utils vim build-base gettext-dev curl bash-completion bash util-linux jq openssh openssl tree
+RUN apk add --no-cache git tmux py2-pip apache2-utils vim build-base gettext-dev curl bash-completion bash util-linux jq openssh openssl tree \
+    && ln -s /usr/local/bin/docker /usr/bin/docker
 
 ENV GOPATH /root/go
 ENV PATH $PATH:$GOPATH
@@ -10,17 +11,21 @@ ENV PATH $PATH:$GOPATH
 # Compile and install httping
 # (used in orchestration workshop, and very useful anyway)
 RUN mkdir -p /opt && cd /opt && \
-    curl https://www.vanheusden.com/httping/httping-2.5.tgz | \
+    curl https://vanheusden.com/httping/httping-2.5.tgz | \
     tar -zxf- && cd httping-2.5 && \
     ./configure && make install LDFLAGS=-lintl && \
     rm -rf httping-2.5
 
-ENV COMPOSE_VERSION=1.18.0
-ENV MACHINE_VERSION=v0.13.0
+ENV DOCKER_TLS_CERTDIR=""
+ENV DOCKER_CLI_EXPERIMENTAL=enabled
+ENV DOCKERAPP_VERSION=v0.8.0
+ENV COMPOSE_VERSION=1.23.2
 # Install Compose and Machine
 RUN pip install docker-compose==${COMPOSE_VERSION}
-RUN curl -L https://github.com/docker/machine/releases/download/${MACHINE_VERSION}/docker-machine-Linux-x86_64 \
-    -o /usr/bin/docker-machine && chmod +x /usr/bin/docker-machine
+
+
+RUN curl -fsSL --output /tmp/docker-app-linux.tar.gz https://github.com/docker/app/releases/download/${DOCKERAPP_VERSION}/docker-app-linux.tar.gz \
+    && tar xf "/tmp/docker-app-linux.tar.gz" -C /tmp/ && mkdir -p /root/.docker/cli-plugins && mv /tmp/docker-app-plugin-linux /root/.docker/cli-plugins/docker-app && rm /tmp/docker-app*
 
 # Add bash completion and set bash as default shell
 RUN mkdir /etc/bash_completion.d \

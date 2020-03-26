@@ -78,6 +78,7 @@ type Playground struct {
 	AvailableDinDInstanceImages []string         `json:"available_dind_instance_images" bson:"available_dind_instance_images"`
 	AllowWindowsInstances       bool             `json:"allow_windows_instances" bson:"allow_windows_instances"`
 	DefaultSessionDuration      time.Duration    `json:"default_session_duration" bson:"default_session_duration"`
+	DindVolumeSize              string           `json:"dind_volume_size" bson:"dind_volume_size"`
 	Extras                      PlaygroundExtras `json:"extras" bson:"extras"`
 	AssetsDir                   string           `json:"assets_dir" bson:"assets_dir"`
 	Tasks                       []string         `json:"tasks" bson:"tasks"`
@@ -87,5 +88,6 @@ type Playground struct {
 	FacebookClientSecret        string           `json:"facebook_client_secret" bson:"facebook_client_secret"`
 	DockerClientID              string           `json:"docker_client_id" bson:"docker_client_id"`
 	DockerClientSecret          string           `json:"docker_client_secret" bson:"docker_client_secret"`
+	DockerHost                  string           `json:"docker_host" bson:"docker_host"`
 	MaxInstances                int              `json:"max_instances" bson:"max_instances"`
 }
